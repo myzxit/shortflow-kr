@@ -1,0 +1,61 @@
+# 숏플로우 전체 구성: 웹 + 렌더링 워커.
+#
+#   AUTH_SECRET=$(openssl rand -base64 32) docker compose up -d --build
+#
+# 웹과 워커는 같은 이미지를 쓰고, /data 볼륨으로 DB와 영상 파일을 공유한다.
+# 영상 파일이 로컬 디스크에 쌓이므로 두 컨테이너는 같은 호스트에 있어야 한다.
+
+services:
+  web:
+    build:
+      context: .
+      args:
+        WHISPER_MODEL: ${WHISPER_MODEL:-small}
+    image: shortflow-kr:latest
+    command: ["web"]
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET 가 필요합니다. openssl rand -base64 32 로 만드세요}
+      AUTH_URL: ${SITE_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:3000}
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # 둘 다 설정하면 기동 시 무제한 관리자 계정이 만들어진다.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    build:
+      context: .
+      args:
+        WHISPER_MODEL: ${WHISPER_MODEL:-small}
+    image: shortflow-kr:latest
+    command: ["worker"]
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET 가 필요합니다}
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ko}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+    volumes:
+      - data:/data
+
+volumes:
+  data:

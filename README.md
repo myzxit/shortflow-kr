@@ -74,6 +74,61 @@ npm run dev            # 1) 웹 (http://localhost:3000)
 npm run worker         # 2) 렌더링 워커
 ```
 
+
+## 서버에 배포하기 (전체 동작)
+
+Docker 한 방으로 웹 + 워커가 같이 뜹니다. ffmpeg·yt-dlp·faster-whisper·한글 폰트가
+이미지 안에 들어 있고, 음성 인식 모델도 빌드할 때 미리 받아 둡니다.
+
+```bash
+git clone https://github.com/myzxit/shortflow-kr.git && cd shortflow-kr
+
+cat > .env <<EOF
+AUTH_SECRET=$(openssl rand -base64 32)
+SITE_URL=https://내도메인.example.com
+ADMIN_EMAIL=admin@내도메인.example.com
+ADMIN_PASSWORD=충분히-긴-비밀번호
+WHISPER_MODEL=small
+EOF
+
+docker compose up -d --build
+```
+
+`http://서버주소:3000` 으로 바로 열립니다. 도메인과 HTTPS를 붙이려면 앞단에
+Caddy·nginx 같은 리버스 프록시를 두고 `SITE_URL` 을 그 주소로 맞추세요.
+
+| 항목 | 값 |
+|------|-----|
+| 첫 빌드 시간 | 5~15분 (모델 다운로드 포함) |
+| 이미지 크기 | 모델 `small` 기준 약 3GB |
+| 최소 사양 | 2 vCPU / 4GB RAM. 음성 인식이 CPU를 오래 씁니다 |
+| 데이터 | `data` 볼륨 하나에 DB와 영상이 모두 들어갑니다 |
+
+웹과 워커는 같은 볼륨을 쓰므로 **같은 호스트**에 있어야 합니다. GPU가 있으면
+`WHISPER_DEVICE=cuda`, `WHISPER_COMPUTE_TYPE=float16` 으로 훨씬 빨라집니다.
+
+```bash
+docker compose logs -f worker     # 처리 상황 보기
+docker compose down               # 중지 (데이터는 볼륨에 남음)
+docker compose down -v            # 데이터까지 삭제
+```
+
+### 관리자 계정
+
+`role=admin` 계정은 **크레딧이 차감되지 않습니다**. 길이 제한 없이 몇 편이든 처리합니다.
+
+```bash
+# 컨테이너 밖에서 직접 만들기
+npm run admin -- admin@example.com '비밀번호8자이상'
+
+# 이미 떠 있는 컨테이너에서
+docker compose exec web npx tsx scripts/create-admin.ts admin@example.com '비밀번호8자이상'
+```
+
+`.env` 에 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 를 넣어 두면 기동할 때마다 맞춰집니다.
+이미 있는 이메일이면 비밀번호만 새로 설정하고 관리자로 올립니다. 작업실 화면에는
+잔여 크레딧이 "무제한" 으로 표시됩니다.
+
 ## 동작 확인
 
 음성 인식 없이 렌더링 경로만 빠르게 확인할 수 있습니다. 합성 영상을 만들어
@@ -97,6 +152,7 @@ npm run smoke          # 결과물: storage/smoke/short-1.mp4
 | `SUBTITLE_FONT` | `NanumGothic` | 시스템에 설치된 한글 폰트 이름 |
 | `AUTH_GOOGLE_ID` / `_SECRET` | 빈 값 | 비우면 이메일 로그인만 활성화 |
 | `STRIPE_SECRET_KEY` | 빈 값 | 비우면 결제가 **모의 결제**로 동작해 크레딧이 바로 지급됩니다 |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 빈 값 | 설정하면 기동 시 무제한 관리자 계정을 만듭니다 |
 
 ## 구조
 

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { toAbsolute, resolveSafe } from "@/lib/paths";
 import { TEMPLATES, ASPECT_RATIOS } from "@/lib/templates";
+import { isUnlimited } from "@/lib/credits";
 
 const YOUTUBE_HOSTS = new Set([
   "youtube.com",
@@ -44,10 +45,10 @@ export async function POST(request: Request) {
   }
   const input = parsed.data;
 
-  // 크레딧이 완전히 바닥난 상태면 시작 자체를 막는다.
+  // 크레딧이 완전히 바닥난 상태면 시작 자체를 막는다. 관리자는 예외.
   // (실제 차감은 영상 길이를 확인한 뒤 워커에서 한다.)
   const user = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id } });
-  if (user.creditSeconds <= 0) {
+  if (!isUnlimited(user) && user.creditSeconds <= 0) {
     return NextResponse.json(
       { error: "남은 크레딧이 없습니다. 요금제 페이지에서 충전해 주세요." },
       { status: 402 }

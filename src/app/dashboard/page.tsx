@@ -5,6 +5,7 @@ import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import ConvertForm from "@/components/ConvertForm";
 import { formatDuration, formatDate, STATUS_LABEL } from "@/lib/format";
+import { isUnlimited } from "@/lib/credits";
 
 export const metadata: Metadata = { title: "내 작업실" };
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ export default async function DashboardPage() {
     include: { _count: { select: { shorts: true } } },
   });
 
+  const unlimited = isUnlimited(user);
+
   const totalShorts = await prisma.short.count({
     where: { project: { userId: user.id }, status: "done" },
   });
@@ -31,14 +34,22 @@ export default async function DashboardPage() {
           <p className="eyebrow">내 작업실</p>
           <h1 className="heading">{user.name || user.email}님</h1>
         </div>
-        <Link href="/pricing" className="btn-ghost">
-          크레딧 충전
-        </Link>
+        {!unlimited && (
+          <Link href="/pricing" className="btn-ghost">
+            크레딧 충전
+          </Link>
+        )}
       </div>
+
+      {unlimited && (
+        <p className="mt-6 rounded-xl bg-[color:var(--color-mint)]/10 px-5 py-3 text-sm text-[color:var(--color-mint)]">
+          관리자 계정입니다. 크레딧 차감 없이 무제한으로 사용합니다.
+        </p>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {[
-          { label: "남은 크레딧", value: formatDuration(user.creditSeconds) },
+          { label: "남은 크레딧", value: unlimited ? "무제한" : formatDuration(user.creditSeconds) },
           { label: "만든 프로젝트", value: `${projects.length}개` },
           { label: "완성한 쇼츠", value: `${totalShorts}개` },
         ].map((stat) => (
@@ -49,7 +60,7 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {user.creditSeconds <= 0 && (
+      {!unlimited && user.creditSeconds <= 0 && (
         <p className="mt-6 rounded-xl bg-yellow-500/10 px-5 py-4 text-sm text-yellow-200">
           남은 크레딧이 없습니다. 새 영상을 처리하려면{" "}
           <Link href="/pricing" className="underline">

@@ -20,6 +20,9 @@ model User {
   image         String?
   passwordHash  String?
 
+  // "user" | "admin". 관리자는 크레딧 차감 없이 무제한으로 쓴다.
+  role          String   @default("user")
+
   // 크레딧은 "처리 가능한 원본 영상 초(sec)" 단위로 관리한다.
   creditSeconds Int      @default(1800) // 가입 시 무료 30분
   createdAt     DateTime @default(now())

@@ -58,9 +58,11 @@ export async function runPipeline(projectId: string): Promise<void> {
   });
 
   // 2. 크레딧 차감 (길이를 확인한 뒤에만 청구한다) ────────────────────────
+  // 관리자 계정은 charged 가 0 으로 돌아오므로 차감도, 환불 대상도 되지 않는다.
   if (project.chargedSeconds === 0) {
+    let charged = 0;
     try {
-      await chargeSeconds(project.userId, durationSec, {
+      charged = await chargeSeconds(project.userId, durationSec, {
         reason: "project_charge",
         projectId,
       });
@@ -73,10 +75,12 @@ export async function runPipeline(projectId: string): Promise<void> {
       }
       throw err;
     }
-    await prisma.project.update({
-      where: { id: projectId },
-      data: { chargedSeconds: durationSec },
-    });
+    if (charged > 0) {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { chargedSeconds: charged },
+      });
+    }
   }
 
   // 3. 음성 인식 ────────────────────────────────────────────────────────
