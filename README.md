@@ -75,6 +75,18 @@ npm run worker         # 2) 렌더링 워커
 ```
 
 
+## 폰에서 쓰기 (안드로이드)
+
+PC나 서버 없이 **폰 하나로** 쓰려면 [`termux/`](termux/) 를 보세요.
+Prisma·Next.js·faster-whisper 는 안드로이드에서 돌지 않아, 네이티브 빌드가 필요 없는
+구성(Node 내장 SQLite + whisper.cpp + 순수 Node 서버)으로 따로 포팅해 두었습니다.
+
+```bash
+pkg install -y git
+git clone https://github.com/myzxit/shortflow-kr.git
+cd shortflow-kr/termux && bash setup.sh && bash start.sh
+```
+
 ## 서버에 배포하기 (전체 동작)
 
 Docker 한 방으로 웹 + 워커가 같이 뜹니다. ffmpeg·yt-dlp·faster-whisper·한글 폰트가

@@ -1,0 +1,14 @@
+{
+  "name": "shortflow-termux",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "숏플로우 안드로이드(Termux) 판 — 의존성 없이 Node 내장 기능만 사용합니다",
+  "scripts": {
+    "setup": "bash setup.sh",
+    "start": "bash start.sh"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
