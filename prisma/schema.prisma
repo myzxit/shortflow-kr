@@ -1,0 +1,169 @@
+// 숏플로우 데이터 모델
+// SQLite 기본. 운영에서는 provider 를 postgresql 로 바꾸고 DATABASE_URL 만 교체하면 된다.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── 인증 (Auth.js) ────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+
+  // 크레딧은 "처리 가능한 원본 영상 초(sec)" 단위로 관리한다.
+  creditSeconds Int      @default(1800) // 가입 시 무료 30분
+  createdAt     DateTime @default(now())
+
+  accounts     Account[]
+  sessions     Session[]
+  projects     Project[]
+  transactions CreditTransaction[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── 도메인 ────────────────────────────────────────────────────────────────
+
+/// 프로젝트 = 롱폼 원본 1건 + 거기서 나온 쇼츠들
+model Project {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title      String
+  sourceType String // "youtube" | "upload"
+  sourceUrl  String?
+  sourcePath String? // 업로드/다운로드된 원본 경로
+
+  durationSec Int     @default(0)
+  status      String  @default("queued") // queued|downloading|transcribing|analyzing|rendering|done|failed
+  progress    Int     @default(0) // 0~100
+  stage       String? // 화면에 보여줄 현재 단계 문구
+  error       String?
+
+  // 생성 옵션
+  templateId   String @default("sandpaper")
+  aspectRatio  String @default("9:16") // 9:16 | 1:1 | 16:9
+  targetCount  Int    @default(0) // 0 = 길이에 맞춰 자동 (2분당 1개)
+  minShortSec  Int    @default(20)
+  maxShortSec  Int    @default(60)
+  removeSilence Boolean @default(true)
+  autoSubtitle  Boolean @default(true)
+  hookVoice     Boolean @default(false)
+
+  transcriptJson String? // faster-whisper 세그먼트 원본
+  chargedSeconds Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shorts Short[]
+  jobs   Job[]
+
+  @@index([userId, createdAt])
+}
+
+/// 생성된 쇼츠 1개
+model Short {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  index       Int
+  title       String
+  startSec    Float
+  endSec      Float
+  score       Float   @default(0)
+  reason      String? // AI가 이 구간을 고른 이유
+  templateId  String  @default("sandpaper")
+  aspectRatio String  @default("9:16")
+
+  status     String  @default("pending") // pending|rendering|done|failed
+  filePath   String?
+  thumbPath  String?
+  subtitleJson String?
+  error      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, index])
+}
+
+/// DB 기반 작업 큐. 별도 브로커 없이 워커가 폴링한다.
+model Job {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type     String // "pipeline" | "rerender"
+  payload  String? // JSON
+  status   String  @default("queued") // queued|running|done|failed
+  attempts Int     @default(0)
+  error    String?
+
+  lockedAt   DateTime?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([status, createdAt])
+}
+
+/// 크레딧 증감 원장
+model CreditTransaction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  seconds   Int // 양수 = 충전, 음수 = 차감
+  reason    String // signup_bonus | purchase | project_charge | refund
+  projectId String?
+  reference String? // Stripe 세션 ID 등
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
