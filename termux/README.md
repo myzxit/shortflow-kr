@@ -27,9 +27,14 @@ Termux를 열고 그대로 붙여넣으세요.
 
 ```bash
 pkg install -y git
-git clone https://github.com/myzxit/shortflow-kr.git
+git clone -b claude/magical-babbage-hn3jeh https://github.com/myzxit/shortflow-kr.git
 cd shortflow-kr/termux && bash setup.sh
 ```
+
+`-b claude/magical-babbage-hn3jeh` 를 빼면 안 됩니다. 이 안드로이드 판은 아직 그 브랜치에만
+있어서, 빼고 받으면 `cd: termux: No such file or directory` 가 납니다.
+(이미 그렇게 받았다면 `cd ~/shortflow-kr && git fetch origin claude/magical-babbage-hn3jeh
+&& git checkout claude/magical-babbage-hn3jeh` 로 옮겨 오면 됩니다.)
 
 `setup.sh`가 하는 일: 패키지 설치 → yt-dlp 설치 → whisper.cpp 빌드 → 음성 인식 모델 다운로드 → 한글 글꼴 다운로드.
 **10~30분** 걸립니다(whisper.cpp 빌드가 대부분). 여러 번 실행해도 끝난 단계는 건너뜁니다.
